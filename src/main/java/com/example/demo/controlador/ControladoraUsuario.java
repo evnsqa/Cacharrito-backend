@@ -31,6 +31,22 @@ public class ControladoraUsuario {
 
     @PostMapping("/registro") 
     public ResponseEntity<?> guardarUsuario(@RequestBody Usuario usuario) {
+        if (usuario.getIdUsuario() == null || usuario.getIdUsuario().isBlank() || usuario.getIdUsuario().length() > 20
+                || usuario.getNombreCompleto() == null || usuario.getNombreCompleto().isBlank() || usuario.getNombreCompleto().length() > 100
+                || usuario.getCorreoElectronico() == null || usuario.getCorreoElectronico().isBlank() || usuario.getCorreoElectronico().length() > 254
+                || usuario.getTelefono() == null || !usuario.getTelefono().matches("[0-9]{10}")) {
+            return new ResponseEntity<>("Revisa identificación (máximo 20 caracteres), nombre (máximo 100), correo (máximo 254) y teléfono (10 dígitos).", HttpStatus.BAD_REQUEST);
+        }
+        if (usuario.getId() == null && (usuario.getPassword() == null || usuario.getPassword().isBlank() || usuario.getPassword().length() > 72)) {
+            return new ResponseEntity<>("La contraseña es obligatoria y no puede superar 72 caracteres.", HttpStatus.BAD_REQUEST);
+        }
+        java.time.LocalDate hoy = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+        if (usuario.getFechaExpedicionLicencia() == null || usuario.getVigenciaLicencia() == null
+                || usuario.getFechaExpedicionLicencia().isAfter(hoy)
+                || usuario.getVigenciaLicencia().isBefore(usuario.getFechaExpedicionLicencia())
+                || usuario.getVigenciaLicencia().isBefore(hoy)) {
+            return new ResponseEntity<>("Las fechas de la licencia no son válidas o la licencia está vencida.", HttpStatus.BAD_REQUEST);
+        }
         if (usuario.getId() == null) {
             if (repoUsuario.existsByIdUsuario(usuario.getIdUsuario())) {
                 return new ResponseEntity<>("El número de identificación ya está registrado", HttpStatus.BAD_REQUEST);

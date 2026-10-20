@@ -59,7 +59,7 @@ public class ControladorAlquiler {
 			return ResponseEntity.badRequest().body(Map.of("mensaje", "Faltan fechas, vehÃ­culo o usuario para registrar el alquiler."));
 		}
 
-		if (alquiler.getFechaInicio().isBefore(java.time.LocalDate.now())) {
+		if (alquiler.getFechaInicio().isBefore(java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota")))) {
 			return ResponseEntity.badRequest().body(Map.of("mensaje", "La fecha de inicio no puede estar en el pasado."));
 		}
 
@@ -182,6 +182,48 @@ public class ControladorAlquiler {
 				"correoEnviado", correoEnviado));
 	}
 
+	@PostMapping("/rechazarAlquiler/")
+	@Transactional
+	public ResponseEntity<?> rechazar(@RequestParam("id") Long id) {
+		Optional<Alquiler> alquilerOpt = repositorioAlquiler.findById(id);
+		if (alquilerOpt.isEmpty()) return ResponseEntity.notFound().build();
+
+		Alquiler alquiler = alquilerOpt.get();
+		boolean pendiente = "pendiente de aceptación".equalsIgnoreCase(alquiler.getEstado())
+				|| ("pendiente de entrega".equalsIgnoreCase(alquiler.getEstado()) && !Boolean.TRUE.equals(alquiler.getPagado()));
+		if (!pendiente) {
+			return ResponseEntity.status(HttpStatus.CONFLICT)
+					.body(Map.of("mensaje", "Solo se pueden rechazar solicitudes que aún no han sido aprobadas o pagadas."));
+		}
+
+		alquiler.setEstado("cancelado");
+		if (alquiler.getVehiculos() != null) {
+			alquiler.getVehiculos().setEstado("Disponible");
+			repositorioVehiculo.save(alquiler.getVehiculos());
+		}
+		repositorioAlquiler.save(alquiler);
+
+		boolean correoEnviado = false;
+		try {
+			SimpleMailMessage mensaje = new SimpleMailMessage();
+			mensaje.setFrom(correoRemitente);
+			mensaje.setTo(alquiler.getUsuario().getCorreoElectronico());
+			mensaje.setSubject("Actualización de tu solicitud de alquiler - Cacharrito");
+			mensaje.setText("Hola " + alquiler.getUsuario().getNombreCompleto() + ",\n\n"
+					+ "Lamentamos informarte que tu solicitud de alquiler #" + id + " fue rechazada.\n"
+					+ "El vehículo " + alquiler.getVehiculos().getNombre() + " (" + alquiler.getVehiculos().getPlaca() + ") vuelve a estar disponible.\n\n"
+					+ "Si tienes preguntas, comunícate con nuestro equipo.\n\nEquipo Cacharrito");
+			mailSender.send(mensaje);
+			correoEnviado = true;
+		} catch (RuntimeException ex) {
+			LOGGER.log(Level.WARNING, "No se pudo enviar el correo de rechazo del alquiler {0}: {1}",
+					new Object[] { id, ex.getMessage() });
+		}
+
+		return ResponseEntity.ok(Map.of(
+				"mensaje", correoEnviado ? "Solicitud rechazada y correo enviado." : "Solicitud rechazada; el correo no se pudo enviar.",
+				"correoEnviado", correoEnviado));
+	}
 	@GetMapping("/buscarPorId/")
 	public ResponseEntity<?> buscarPorId(@RequestParam("id") Long id) {
 		Optional<Alquiler> alquilerOpt = repositorioAlquiler.findById(id);
