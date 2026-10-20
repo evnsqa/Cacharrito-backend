@@ -21,6 +21,8 @@ public interface alquileres extends JpaRepository<Alquiler, Long> {
 
 	@Query("SELECT a FROM Alquiler a WHERE a.usuario.id = :idUsuario AND a.estado NOT IN ('cancelado', 'devuelto') ORDER BY a.numeroAlquiler DESC")
 	List<Alquiler> alquileresPorUsuario(@Param("idUsuario") Long idUsuario);
+	@Query("SELECT a FROM Alquiler a WHERE a.usuario.idUsuario = :idUsuario ORDER BY a.numeroAlquiler DESC")
+	List<Alquiler> historialAlquileresPorUsuario(@Param("idUsuario") String idUsuario);
 	
 	@Query("SELECT a FROM Alquiler a WHERE LOWER(a.estado) = 'entregado' ORDER BY a.numeroAlquiler DESC")
 	List<Alquiler> alquileresEntregados();

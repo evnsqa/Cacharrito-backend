@@ -101,6 +101,15 @@ public class ControladorAlquiler {
 		return repositorioAlquiler.alquileresPorUsuario(idUsuario);
 	}
 
+	@GetMapping("/historialPorUsuario/")
+	public List<Alquiler> historialPorUsuario(@RequestParam("idUsuario") String idUsuario) {
+		return repositorioAlquiler.historialAlquileresPorUsuario(idUsuario);
+	}
+
+	@GetMapping("/historialCompleto/")
+	public List<Alquiler> historialCompleto() {
+		return repositorioAlquiler.findAll();
+	}
 	@PostMapping("/cancelarAlquiler/")
 	@Transactional
 	public ResponseEntity<?> cancelar(@RequestParam("id") Long id) {
