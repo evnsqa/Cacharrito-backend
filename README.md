@@ -20,12 +20,14 @@ Para habilitar el correo, configura también:
 ```powershell
 $env:MAIL_USERNAME = '<EMAIL_ACCOUNT>'
 $env:MAIL_PASSWORD = '<EMAIL_PROVIDER_APP_PASSWORD>'
-$env:MAIL_FROM = '<SENDER_ADDRESS>'
+$env:MAIL_FROM = '<VERIFIED_SENDER_EMAIL>'
+$env:MAIL_FROM_NAME = 'Cacharrito'
+$env:BREVO_API_KEY = '<BREVO_API_KEY>'
 $env:FRONTEND_URL = 'http://localhost:4200'
 ```
 
 Después, desde esta carpeta, inicia Spring Boot con `./mvnw.cmd spring-boot:run`. Las variables solo estarán disponibles en esa ventana de PowerShell. En Render, agrega los mismos nombres desde la sección **Environment** del servicio.
 
-El correo es opcional para las funciones básicas. Sin esas variables, los mensajes de aprobación no podrán enviarse.
+Para Render Free, configura BREVO_API_KEY y MAIL_FROM con un remitente registrado y verificado en Brevo. El backend usa la API HTTPS de Brevo cuando hay una clave y mantiene SMTP como alternativa local. Render Free bloquea el SMTP saliente en los puertos 25, 465 y 587.
 
 Las contraseñas existentes en texto plano se convierten a BCrypt cuando el usuario inicia sesión correctamente. Las nuevas contraseñas se guardan con BCrypt y no se incluyen en las respuestas JSON.

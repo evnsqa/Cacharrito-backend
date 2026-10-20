@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClient;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 import com.example.demo.modelo.Alquiler;
@@ -50,6 +52,13 @@ public class ControladorAlquiler {
 
 	@Value("${spring.mail.from:noreply@cacharrito.local}")
 	private String correoRemitente;
+	@Value("${MAIL_FROM_NAME:Cacharrito}")
+	private String nombreRemitente;
+
+	@Value("${BREVO_API_KEY:}")
+	private String brevoApiKey;
+
+	private final RestClient brevoClient = RestClient.builder().baseUrl("https://api.brevo.com").build();
 
 	@PostMapping("/guardarAlquiler/")
 	@Transactional
@@ -170,7 +179,7 @@ public class ControladorAlquiler {
 					+ "Aprobamos tu solicitud para el vehículo " + alquiler.getVehiculos().getNombre() + " (" + alquiler.getVehiculos().getPlaca() + ").\n"
 					+ "Total de la reserva: $" + alquiler.getValorTotal() + " COP.\n\n"
 					+ "Completa el pago simulado desde este enlace: " + enlacePago + "\n\nEquipo Cacharrito");
-			mailSender.send(mensaje);
+			enviarCorreo(mensaje);
 			correoEnviado = true;
 		} catch (RuntimeException ex) {
 			LOGGER.log(Level.WARNING, "No se pudo enviar el correo de aprobación del alquiler {0}: {1}",
@@ -213,7 +222,7 @@ public class ControladorAlquiler {
 					+ "Lamentamos informarte que tu solicitud de alquiler #" + id + " fue rechazada.\n"
 					+ "El vehículo " + alquiler.getVehiculos().getNombre() + " (" + alquiler.getVehiculos().getPlaca() + ") vuelve a estar disponible.\n\n"
 					+ "Si tienes preguntas, comunícate con nuestro equipo.\n\nEquipo Cacharrito");
-			mailSender.send(mensaje);
+			enviarCorreo(mensaje);
 			correoEnviado = true;
 		} catch (RuntimeException ex) {
 			LOGGER.log(Level.WARNING, "No se pudo enviar el correo de rechazo del alquiler {0}: {1}",
@@ -223,6 +232,33 @@ public class ControladorAlquiler {
 		return ResponseEntity.ok(Map.of(
 				"mensaje", correoEnviado ? "Solicitud rechazada y correo enviado." : "Solicitud rechazada; el correo no se pudo enviar.",
 				"correoEnviado", correoEnviado));
+	}
+	private void enviarCorreo(SimpleMailMessage mensaje) {
+		if (brevoApiKey != null && !brevoApiKey.isBlank()) {
+			String remitente = mensaje.getFrom();
+			String[] destinatarios = mensaje.getTo();
+			if (remitente == null || remitente.isBlank() || remitente.endsWith(".local")) {
+				throw new IllegalStateException("Configura MAIL_FROM con un remitente verificado en Brevo.");
+			}
+			if (destinatarios == null || destinatarios.length == 0) {
+				throw new IllegalStateException("El mensaje no tiene destinatario.");
+			}
+
+			Map<String, Object> payload = Map.of(
+					"sender", Map.of("name", nombreRemitente, "email", remitente),
+					"to", List.of(Map.of("email", destinatarios[0])),
+					"subject", mensaje.getSubject(),
+					"textContent", mensaje.getText());
+			brevoClient.post()
+					.uri("/v3/smtp/email")
+					.header("api-key", brevoApiKey)
+					.contentType(MediaType.APPLICATION_JSON)
+					.body(payload)
+					.retrieve()
+					.toBodilessEntity();
+			return;
+		}
+		mailSender.send(mensaje);
 	}
 	@GetMapping("/buscarPorId/")
 	public ResponseEntity<?> buscarPorId(@RequestParam("id") Long id) {
